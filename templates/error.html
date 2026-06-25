@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Error {{ .Code }}</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png">
+    <link rel="icon" href="/static/favicon.ico">
+    <link rel="manifest" href="/static/site.webmanifest">
+    <link rel="stylesheet" href="/static/style.css">
+    
+    <!-- Targeted styling overrides to keep the error screen tight and cohesive -->
+    
+</head>
+<body>
+
+<div class="container error-wrapper">
+
+    <header class="hero">
+        <h1>ASCII Art Web</h1>
+    </header>
+
+    <!-- Added custom classes to map your specific background styles cleanly -->
+    <section class="card error-card">
+
+        <h2>{{ .Code }}</h2>
+
+        <p>{{ .Message }}</p>
+
+        <a href="/" class="return-btn">
+            Return Home
+        </a>
+
+    </section>
+
+</div>
+
+</body>
+</html>

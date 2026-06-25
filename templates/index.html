@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>ASCII Art Web</title>
+
+<link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png">
+<link rel="manifest" href="/static/site.webmanifest">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400..700&family=Merienda:wght@300..900&family=Rye&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="/static/style.css">
+
+</head>
+
+<body>
+
+<div class="container">
+
+    <header class="hero">
+
+        <div class="hero-frame">
+
+           <span class="hero-mark" aria-hidden="true">///</span>
+
+            <div class="hero-line" aria-hidden="true"></div>
+
+            <h1>ASCII Art Web</h1>
+
+            <div class="hero-line" aria-hidden="true"></div>
+
+            <span class="hero-mark" aria-hidden="true">///</span>
+        </div>
+
+        <p>
+            Convert your text into ASCII art using different banner styles.
+        </p>
+
+    </header>
+
+    <form method="POST" action="/ascii-art" class="content-grid">
+
+        <section class="card controls-card">
+
+            <div class="panel-title banner-title">
+
+                <span>Banner Style</span>
+
+                <div class="title-accent"></div>
+
+                <span class="cyber-mark" aria-hidden="true">///</span>
+
+            </div>
+
+            <div class="radio-row">
+
+                <input
+                    type="radio"
+                    id="standard"
+                    name="banner"
+                    value="standard"
+                    {{ if or (eq .Banner "") (eq .Banner "standard") }}checked{{ end }}
+                >
+
+                <label for="standard">Standard</label>
+
+            </div>
+
+            <div class="radio-row">
+
+                <input
+                    type="radio"
+                    id="shadow"
+                    name="banner"
+                    value="shadow"
+                    {{ if eq .Banner "shadow" }}checked{{ end }}
+                >
+
+                <label for="shadow">Shadow</label>
+
+            </div>
+
+            <div class="radio-row">
+
+                <input
+                    type="radio"
+                    id="thinkertoy"
+                    name="banner"
+                    value="thinkertoy"
+                    {{ if eq .Banner "thinkertoy" }}checked{{ end }}
+                >
+
+                <label for="thinkertoy">Thinkertoy</label>
+
+            </div>
+
+            <div class="button-row">
+
+                <button class="generate-btn" type="submit">
+                    <span class="btn-icon">⚡</span>
+                    <span>Generate ASCII Art</span>
+                </button>
+
+                <a href="/" class="reset-btn">
+                    <span class="btn-icon">🔄</span>
+                    <span>Reset Page</span>
+                </a>
+
+            </div>
+
+            {{ if .Error }}
+            <div class="error-box">
+                <p>{{ .Error }}</p>
+            </div>
+            {{ end }}
+
+        </section>
+
+        <section class="card workspace-card">
+
+            <div class="input-section">
+
+                <div class="panel-title">
+
+                    <label for="text-input">
+                        Enter your text
+                    </label>
+
+                    <div class="title-accent"></div>
+
+                   <span class="cyber-mark" aria-hidden="true">///</span>
+
+                </div>
+
+                <textarea
+                    id="text-input"
+                    name="text"
+                    rows="6"
+                    placeholder="Type text here..."
+                >{{ .Text }}</textarea>
+
+            </div>
+
+            <div class="output-section">
+
+                <div class="panel-title">
+
+                    <span>Generated ASCII Art</span>
+
+                    <div class="title-accent"></div>
+
+                    <span class="cyber-mark" aria-hidden="true">///</span>
+
+                </div>
+
+                <div class="ascii-output">
+                    <pre>{{ .Result }}</pre>
+                </div>
+
+            </div>
+
+        </section>
+
+    </form>
+
+    <footer class="footer-frame">
+
+        Created by
+        <span class="footer-icon" aria-hidden="true">♥</span>
+
+        elgeorgiou | gpapadaki
+
+        <span class="footer-icon" aria-hidden="true">🎮</span>
+
+    </footer>
+
+</div>
+
+</body>
+
+</html>
