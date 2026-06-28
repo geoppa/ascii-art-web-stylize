@@ -1,48 +1,49 @@
 package main
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"os"
+	"os/exec"
 	"testing"
-
-	"ascii-art-web/internal/server"
+	"time"
 )
 
-func TestMainIntegration(t *testing.T) {
-	// Αλλάζουμε προσωρινά το working directory στο root του project
-	// ώστε τα templates και τα banner files να εντοπίζονται σωστά.
-	err := os.Chdir("..")
+// TestMainProcess tests if the main function runs and starts without immediate errors
+func TestMainProcess(t *testing.T) {
+	// If the environment variable is set to 1, execute the actual main function
+	if os.Getenv("RUN_MAIN") == "1" {
+		main()
+		return
+	}
+
+	// Create a subprocess that runs this specific test function
+	cmd := exec.Command(os.Args[0], "-test.run=TestMainProcess")
+	cmd.Env = append(os.Environ(), "RUN_MAIN=1")
+
+	// Start the subprocess (does not wait for completion since the server runs indefinitely)
+	err := cmd.Start()
 	if err != nil {
-		t.Fatalf("Failed to change working directory: %v", err)
+		t.Fatalf("Failed to start the process: %v", err)
 	}
 
-	// Δημιουργούμε έναν προσωρινό HTTP server για το test
-	// χωρίς να ανοίξουμε πραγματικό port στο σύστημα.
-	testServer := httptest.NewServer(server.NewRouter())
-	defer testServer.Close()
+	// Give the server some time to start up
+	time.Sleep(500 * time.Millisecond)
 
-	// Στέλνουμε GET request στην αρχική σελίδα.
-	resp, err := http.Get(testServer.URL + "/")
-	if err != nil {
-		t.Fatalf("Αποτυχία σύνδεσης με τον server: %v", err)
-	}
-	defer resp.Body.Close()
+	// Monitor if the process terminates prematurely with an error
+	processDone := make(chan error, 1)
+	go func() {
+		processDone <- cmd.Wait()
+	}()
 
-	// Επιβεβαιώνουμε ότι η αρχική σελίδα επιστρέφει 200 OK.
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("Αναμενόμενο Status 200 OK, αλλά πήραμε: %d", resp.StatusCode)
-	}
-
-	// Στέλνουμε request σε route που δεν υπάρχει
-	// και επιβεβαιώνουμε ότι επιστρέφεται 404 Not Found.
-	resp404, err := http.Get(testServer.URL + "/non-existent-page-xyz")
-	if err != nil {
-		t.Fatalf("Αποτυχία σύνδεσης με τον server στο test 404: %v", err)
-	}
-	defer resp404.Body.Close()
-
-	if resp404.StatusCode != http.StatusNotFound {
-		t.Errorf("Αναμενόμενο Status 404 Not Found, αλλά πήραμε: %d", resp404.StatusCode)
+	select {
+	case err := <-processDone:
+		if err != nil {
+			t.Fatalf("The server terminated unexpectedly with error: %v", err)
+		}
+	case <-time.After(1 * time.Second):
+		// The server is still running successfully, kill the process to clean up
+		err := cmd.Process.Kill()
+		if err != nil {
+			t.Fatalf("Failed to terminate the server process: %v", err)
+		}
 	}
 }

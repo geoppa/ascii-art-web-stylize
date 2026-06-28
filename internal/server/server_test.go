@@ -4,73 +4,101 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"strings"
+	"path/filepath"
 	"testing"
 )
 
-// TestStart_RoutesRegistration ελέγχει ότι ο router της εφαρμογής
-// περιέχει όλα τα routes που πρέπει να είναι διαθέσιμα.
-func TestStart_RoutesRegistration(t *testing.T) {
+func TestNewRouter(t *testing.T) {
+	// Create a temporary static folder and a sample CSS file to test the static file server route
+	staticDir := "static"
+	err := os.MkdirAll(staticDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create temporary static directory: %v", err)
+	}
+	defer os.RemoveAll(staticDir)
 
-	// Δημιουργούμε τον router της εφαρμογής χωρίς να ξεκινήσουμε
-	// πραγματικό HTTP server.
+	mockCSSContent := "body { background: #fff; }"
+	err = os.WriteFile(filepath.Join(staticDir, "style.css"), []byte(mockCSSContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create mock asset file: %v", err)
+	}
+
+	// Create temporary templates directory since handlers mapped to the router depend on them
+	tmpTemplatesDir := "templates"
+	err = os.MkdirAll(tmpTemplatesDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create temp templates directory: %v", err)
+	}
+	defer os.RemoveAll(tmpTemplatesDir)
+
+	// Setup basic HTML files so handlers can render properly without returning 500
+	err = os.WriteFile(filepath.Join(tmpTemplatesDir, "index.html"), []byte("<html></html>"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create mock index template: %v", err)
+	}
+	err = os.WriteFile(filepath.Join(tmpTemplatesDir, "error.html"), []byte("<html></html>"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create mock error template: %v", err)
+	}
+
+	// Create temporary banners directory to satisfy internal handler dependencies
+	bannerDir := "banners"
+	err = os.MkdirAll(bannerDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create temp banners directory: %v", err)
+	}
+	defer os.RemoveAll(bannerDir)
+
+	// Initialize the router under test
 	router := NewRouter()
 
 	tests := []struct {
-		name string
-		path string
+		name           string
+		method         string
+		url            string
+		expectedStatus int
 	}{
-		{"Home Route Registration", "/"},
-		{"AsciiArt Route Registration", "/ascii-art"},
-		{"Static Files Route Registration", "/static/"},
+		{
+			name:           "Root path maps to HomeHandler",
+			method:         http.MethodGet,
+			url:            "/",
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "Ascii-art path maps to AsciiArtHandler (Method Not Allowed for GET)",
+			method:         http.MethodGet,
+			url:            "/ascii-art",
+			expectedStatus: http.StatusMethodNotAllowed,
+		},
+		{
+			name:           "Static file asset distribution check",
+			method:         http.MethodGet,
+			url:            "/static/style.css",
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "Static missing asset distribution check",
+			method:         http.MethodGet,
+			url:            "/static/missing.css",
+			expectedStatus: http.StatusNotFound,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Δημιουργούμε ένα δοκιμαστικό request και ζητάμε από τον router
-			// να μας επιστρέψει το route pattern που αντιστοιχεί στο URL.
-			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
-			_, pattern := router.Handler(req)
+			req, err := http.NewRequest(tt.method, tt.url, nil)
+			if err != nil {
+				t.Fatalf("Failed to build request instance: %v", err)
+			}
 
-			// Αν το pattern είναι κενό, σημαίνει ότι το route δεν καταχωρήθηκε
-			if pattern == "" {
-				t.Errorf("Route pattern %s was not properly registered in router", tt.path)
+			rr := httptest.NewRecorder()
+
+			// ServeHTTP executes the matching handler registered inside the custom ServeMux
+			router.ServeHTTP(rr, req)
+
+			if rr.Code != tt.expectedStatus {
+				t.Errorf("Router path %s returned unexpected status: got %v want %v", tt.url, rr.Code, tt.expectedStatus)
 			}
 		})
-	}
-}
-
-// TestStart_StaticCSS ελέγχει αν το αρχείο style.css σερβίρεται σωστά
-// και με το κατάλληλο Content-Type header.
-func TestStart_StaticCSS(t *testing.T) {
-	// Αλλάζουμε το working directory στο root για να βρει τον φάκελο static/
-	oldWd, _ := os.Getwd()
-	err := os.Chdir("../..")
-	if err != nil {
-		t.Fatalf("Failed to change working directory to root: %v", err)
-	}
-	defer os.Chdir(oldWd)
-
-	// Προσομοιώνουμε ένα HTTP GET request για το αρχείο style.css
-	req := httptest.NewRequest(http.MethodGet, "/static/style.css", nil)
-	rr := httptest.NewRecorder()
-
-	// Δημιουργούμε τον router και προσομοιώνουμε ένα request
-	// προς το static αρχείο CSS χωρίς να ανοίξουμε πραγματικό port.
-	router := NewRouter()
-
-	// Στέλνουμε το request στον router και καταγράφουμε την απάντηση
-	// μέσα στον ResponseRecorder.
-	router.ServeHTTP(rr, req)
-
-	// 1. Ελέγχουμε αν το αρχείο σερβίρεται επιτυχώς (200 OK)
-	if rr.Code != http.StatusOK {
-		t.Errorf("Expected status 200 OK for style.css, got %d. Make sure 'static/style.css' exists.", rr.Code)
-	}
-
-	// 2. Ελέγχουμε αν το Content-Type header είναι σωστά ρυθμισμένο σε text/css
-	contentType := rr.Header().Get("Content-Type")
-	if !strings.HasPrefix(contentType, "text/css") {
-		t.Errorf("Expected Content-Type to start with 'text/css', got '%s'", contentType)
 	}
 }

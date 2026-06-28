@@ -3,65 +3,64 @@ package banner
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
-func TestLoad_SuccessAndSanitization(t *testing.T) {
-	// 1. Δημιουργούμε έναν προσωρινό φάκελο "banners" για το test
-	tmpDir, err := os.MkdirTemp("", "banners_test")
+func TestLoad(t *testing.T) {
+	// Create a temporary "banners" directory for testing isolation
+	tmpDir := "banners"
+	err := os.MkdirAll(tmpDir, 0755)
 	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
+		t.Fatalf("Failed to create temp banners directory: %v", err)
 	}
+	// Clean up the temporary directory after tests finish
 	defer os.RemoveAll(tmpDir)
 
-	// Αλλάζουμε προσωρινά το working directory στον temp φάκελο,
-	// ώστε η Load() να ψάξει στο "./banners/" που δημιουργούμε τώρα
-	oldWd, _ := os.Getwd()
-	err = os.Chdir(tmpDir)
+	// Create a mock banner file with mixed Windows (\r\n) and Unix (\n) line endings
+	mockContent := "line1\r\nline2\nline3\r\n"
+	mockFileName := "test_banner.txt"
+	err = os.WriteFile(filepath.Join(tmpDir, mockFileName), []byte(mockContent), 0644)
 	if err != nil {
-		t.Fatalf("Failed to change working directory: %v", err)
-	}
-	defer os.Chdir(oldWd) // Επαναφορά του αρχικού directory στο τέλος του test
-
-	err = os.Mkdir("banners", 0755)
-	if err != nil {
-		t.Fatalf("Failed to create banners subdirectory: %v", err)
+		t.Fatalf("Failed to create mock banner file: %v", err)
 	}
 
-	// 2. Δημιουργούμε ένα mock banner αρχείο που περιέχει Windows carriage returns (\r\n)
-	// για να προσομοιώσουμε τη συμπεριφορά του thinkertoy.txt
-	mockContent := "line1\r\nline2\r\nline3\r\n"
-	tmpFile := filepath.Join("banners", "mock_banner.txt")
-	err = os.WriteFile(tmpFile, []byte(mockContent), 0644)
-	if err != nil {
-		t.Fatalf("Failed to write mock banner file: %v", err)
+	// Define test cases
+	tests := []struct {
+		name       string
+		bannerName string
+		wantLines  []string
+		wantErr    bool
+	}{
+		{
+			name:       "Successful load and carriage return stripping",
+			bannerName: "test_banner.txt",
+			wantLines:  []string{"line1", "line2", "line3"},
+			wantErr:    false,
+		},
+		{
+			name:       "File does not exist error handling",
+			bannerName: "missing_banner.txt",
+			wantLines:  nil,
+			wantErr:    true,
+		},
 	}
 
-	// 3. Εκτελούμε τη συνάρτηση Load
-	lines, err := Load("mock_banner.txt")
-	if err != nil {
-		t.Fatalf("Load() returned an unexpected error: %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// FIXED: Changed tt.Load to Load
+			gotLines, err := Load(tt.bannerName)
 
-	// 4. Έλεγχος αν διαβάστηκαν σωστά οι γραμμές (πρέπει να είναι 3)
-	if len(lines) != 3 {
-		t.Errorf("Expected 3 lines, got %d", len(lines))
-	}
-
-	// 5. ΚΡΙΣΙΜΟΣ ΕΛΕΓΧΟΣ: Βεβαιωνόμαστε ότι το '\r' αφαιρέθηκε επιτυχώς
-	for _, line := range lines {
-		for _, char := range line {
-			if char == '\r' {
-				t.Errorf("Load() failed to strip out Windows carriage return (\\r)")
+			// Check if error presence matches expectation
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Load() error = %v, wantErr %v", err, tt.wantErr)
+				return
 			}
-		}
-	}
-}
 
-func TestLoad_FileNotFound(t *testing.T) {
-	// Έλεγχος ότι η συνάρτηση επιστρέφει σωστά σφάλμα αν το αρχείο δεν υπάρχει
-	_, err := Load("non_existent_banner_file_xyz.txt")
-	if err == nil {
-		t.Errorf("Expected an error for non-existent file, but got nil")
+			// Check if the parsed lines match expectation
+			if !reflect.DeepEqual(gotLines, tt.wantLines) {
+				t.Errorf("Load() gotLines = %v, want %v", gotLines, tt.wantLines)
+			}
+		})
 	}
 }
